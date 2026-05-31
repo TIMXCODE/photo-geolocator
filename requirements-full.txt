@@ -1,0 +1,18 @@
+# Full mode: the heavy visual engines.
+# Requires an instance with ~2 GB+ RAM and several GB of disk for weights.
+# Install with:  pip install -r requirements.txt -r requirements-full.txt
+-r requirements.txt
+
+torch==2.5.1            # CPU build; large download
+geoclip==1.2.0          # pulls model weights from Hugging Face on first run
+easyocr==1.7.2          # OCR corroboration (also pulls torch + weights)
+
+# GeoCLIP 1.2.0 leaves `transformers` unpinned, but transformers 5.x changed
+# CLIP.get_image_features() to return a wrapped output object instead of a
+# tensor, which breaks GeoCLIP's image encoder
+# (TypeError: linear() ... must be Tensor, not BaseModelOutputWithPooling).
+# Pin to a 4.x release that returns a tensor.
+transformers==4.46.3
+
+# Object detection (cars, signs, poles, etc.). Auto-downloads small weights.
+ultralytics==8.3.0

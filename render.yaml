@@ -1,0 +1,22 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Commit this file to the repo root, then in Render: New + > Blueprint > pick the repo.
+services:
+  - type: web
+    name: photo-geolocator
+    runtime: python
+    plan: free            # lite mode (no GeoCLIP). See README to upgrade for full mode.
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      # Lite mode: engines stay off so the free instance boots fast and never OOMs.
+      # Flip these to "true" only on an instance sized for torch (>= 2 GB RAM)
+      # and switch buildCommand to also install requirements-full.txt.
+      - key: ENABLE_GEOCLIP
+        value: "false"
+      - key: ENABLE_OCR
+        value: "false"
+      - key: MAX_UPLOAD_MB
+        value: "15"

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GEOLOCATOR — visual geolocation console</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08080a; --panel:#100c0e; --panel-2:#181012; --line:#321a1f;
+    --ink:#ece0e2; --dim:#9a8388; --faint:#6a4f54;
+    --amber:#e0143c; --amber-dim:#7a0f24; --cyan:#ff5470; --red:#ff3b5c;
+    --evidence:#7a6a6e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'JetBrains Mono',ui-monospace,monospace;
+    font-size:13px; line-height:1.5;
+    background-image:
+      radial-gradient(circle at 12% -10%, rgba(224,20,60,.12), transparent 45%),
+      radial-gradient(circle at 100% 0%, rgba(255,59,92,.08), transparent 40%),
+      linear-gradient(160deg, #0d0709 0%, #08080a 55%, #050405 100%);
+    overflow:hidden;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .brand{display:flex; align-items:center; gap:14px}
+  .brand .mark{
+    width:30px;height:30px;border:1.5px solid var(--amber);border-radius:50%;
+    position:relative;flex:0 0 auto;
+  }
+  .brand .mark::after{
+    content:"";position:absolute;inset:8px;border-radius:50%;
+    border:1.5px solid var(--amber);
+  }
+  .brand .mark::before{
+    content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1.5px;
+    background:var(--amber);transform:translateX(-50%);
+  }
+  h1{font-family:'Archivo',sans-serif;font-weight:800;font-size:17px;letter-spacing:.14em}
+  h1 span{color:var(--amber)}
+  .tagline{color:var(--faint);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase}
+  .status-chip{
+    font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+    border:1px solid var(--line);padding:5px 11px;border-radius:2px;
+  }
+  main{display:grid;grid-template-columns:380px 1fr;height:calc(100vh - 61px)}
+  /* ---- left rail ---- */
+  .rail{border-right:1px solid var(--line);background:var(--panel);overflow-y:auto;display:flex;flex-direction:column}
+  .drop{
+    margin:18px;padding:30px 18px;border:1.5px dashed var(--line);border-radius:4px;
+    text-align:center;cursor:pointer;transition:.15s;background:var(--panel-2);
+  }
+  .drop:hover,.drop.hot{border-color:var(--amber);background:#1d2024}
+  .drop .big{font-family:'Archivo',sans-serif;font-weight:600;font-size:14px;letter-spacing:.04em;color:var(--ink)}
+  .drop .small{color:var(--faint);font-size:10.5px;margin-top:7px;letter-spacing:.05em}
+  .preview{margin:0 18px 14px;display:none}
+  .preview img{width:100%;border:1px solid var(--line);border-radius:3px;display:block}
+  .section{padding:16px 18px;border-top:1px solid var(--line)}
+  .section h2{
+    font-family:'Archivo',sans-serif;font-weight:600;font-size:10.5px;
+    letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:12px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .pillcount{color:var(--faint);font-weight:400}
+  .cand{
+    border:1px solid var(--line);border-left:2px solid var(--amber-dim);
+    border-radius:3px;padding:10px 12px;margin-bottom:9px;cursor:pointer;transition:.12s;
+    background:var(--panel-2);
+  }
+  .cand:hover{border-color:var(--amber);background:#1d2228}
+  .cand.active{border-left-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber-dim)}
+  .cand .top{display:flex;justify-content:space-between;align-items:baseline}
+  .cand .rank{color:var(--amber);font-weight:700}
+  .cand .conf{color:var(--dim);font-size:11px}
+  .cand .coords{color:var(--ink);margin-top:4px;font-size:12px}
+  .bar{height:3px;background:#2a1418;border-radius:2px;margin-top:8px;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber-dim),var(--amber))}
+  .clue,.evi{
+    border:1px solid var(--line);border-radius:3px;padding:8px 11px;margin-bottom:7px;
+    background:var(--panel-2);font-size:12px;
+  }
+  .clue .lbl,.evi .lbl{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:3px}
+  .clue .val{color:var(--cyan);word-break:break-word}
+  .evi{border-left:2px solid var(--evidence);opacity:.92}
+  .evi .val{color:var(--evidence)}
+  .evi .note{color:var(--faint);font-size:10px;margin-top:3px}
+  .empty{color:var(--faint);font-size:11.5px;font-style:italic}
+  .notes{margin:0 18px 18px;padding:11px 13px;border:1px solid var(--amber-dim);
+    border-radius:3px;background:rgba(224,20,60,.08);font-size:11px;color:var(--dim)}
+  .notes b{color:var(--amber);font-weight:700;display:block;margin-bottom:5px;letter-spacing:.06em}
+  .notes div{margin-bottom:3px}
+  /* ---- map side ---- */
+  .stage{position:relative}
+  #map{position:absolute;inset:0;background:#0a0c0d}
+  .leaflet-container{background:#0a0c0d;font-family:'JetBrains Mono',monospace}
+  .confirm-bar{
+    position:absolute;left:0;right:0;bottom:0;z-index:600;
+    background:linear-gradient(0deg,var(--panel) 60%,transparent);
+    padding:18px 20px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;
+  }
+  .confirm-bar.hidden{display:none}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .field input{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    padding:7px 10px;border-radius:3px;font-family:inherit;font-size:12px;width:140px;
+  }
+  .field input:focus{outline:none;border-color:var(--amber)}
+  .field.wide input{width:230px}
+  button{
+    font-family:'Archivo',sans-serif;font-weight:600;letter-spacing:.08em;font-size:12px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+    padding:9px 16px;border-radius:3px;cursor:pointer;transition:.12s;text-transform:uppercase;
+  }
+  button:hover{border-color:var(--amber);color:var(--amber)}
+  button.primary{background:var(--amber);color:#1a1207;border-color:var(--amber)}
+  button.primary:hover{background:#ffb14d}
+  button.ghost:hover{border-color:var(--red);color:var(--red)}
+  .toast{
+    position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:700;
+    background:var(--panel);border:1px solid var(--amber);color:var(--ink);
+    padding:11px 18px;border-radius:3px;font-size:12px;display:none;
+    box-shadow:0 8px 30px rgba(0,0,0,.5);
+  }
+  .toast.confirmed{border-color:var(--cyan)}
+  .hint{position:absolute;top:14px;left:14px;z-index:600;background:rgba(20,24,27,.9);
+    border:1px solid var(--line);padding:7px 12px;border-radius:3px;font-size:10.5px;color:var(--dim)}
+  .leaflet-popup-content-wrapper{background:var(--panel);color:var(--ink);border:1px solid var(--amber);border-radius:3px}
+  .leaflet-popup-tip{background:var(--panel)}
+  .spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--amber-dim);
+    border-top-color:var(--amber);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  ::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#262d33;border-radius:5px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="mark"></div>
+    <div>
+      <h1>GEO<span>LOCATOR</span></h1>
+      <div class="tagline">visual geolocation · evidence trail</div>
+    </div>
+  </div>
+  <div class="status-chip" id="statusChip">no case loaded</div>
+</header>
+
+<main>
+  <aside class="rail">
+    <div class="drop" id="drop">
+      <div class="big" id="dropBig">Drop a photo to analyze</div>
+      <div class="small">or click to browse · jpg / png / webp / tiff</div>
+      <input type="file" id="file" accept="image/*" hidden />
+    </div>
+    <div class="preview" id="preview"><img id="previewImg" alt="uploaded" /></div>
+
+    <div class="notes" id="notes" style="display:none"></div>
+
+    <div class="section">
+      <h2>Candidates <span class="pillcount" id="candCount">visual engine</span></h2>
+      <div id="candidates"><div class="empty">No candidates yet.</div></div>
+    </div>
+
+    <div class="section">
+      <h2>Corroborating clues <span class="pillcount">pixels</span></h2>
+      <div id="clues"><div class="empty">No clues yet.</div></div>
+    </div>
+
+    <div class="section">
+      <h2>Metadata <span class="pillcount">evidence only</span></h2>
+      <div id="evidence"><div class="empty">No metadata logged.</div></div>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div id="map"></div>
+    <div class="hint">Click a candidate, or click the map, to stage a pin.</div>
+    <div class="toast" id="toast"></div>
+    <div class="confirm-bar hidden" id="confirmBar">
+      <div class="field"><label>Latitude</label><input id="latIn" placeholder="—" /></div>
+      <div class="field"><label>Longitude</label><input id="lonIn" placeholder="—" /></div>
+      <div class="field wide"><label>Analyst note</label><input id="noteIn" placeholder="basis for confirmation" /></div>
+      <button class="primary" id="confirmBtn">Confirm pin</button>
+      <button class="ghost" id="inconclusiveBtn">Inconclusive</button>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const $ = s => document.querySelector(s);
+let map, candidateLayer, stagedMarker, currentCase = null;
+
+function initMap(){
+  map = L.map('map', {zoomControl:true, worldCopyJump:true}).setView([20,0], 2);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'© OpenStreetMap · © CARTO', maxZoom:19
+  }).addTo(map);
+  candidateLayer = L.layerGroup().addTo(map);
+  map.on('click', e => stagePin(e.latlng.lat, e.latlng.lng, 'map click'));
+}
+
+function setStatus(t, cls){
+  const chip = $('#statusChip'); chip.textContent = t;
+  chip.style.color = cls === 'confirmed' ? 'var(--cyan)' : cls === 'pending' ? 'var(--amber)' : 'var(--dim)';
+  chip.style.borderColor = cls === 'confirmed' ? 'var(--cyan)' : cls === 'pending' ? 'var(--amber)' : 'var(--line)';
+}
+
+function toast(msg, cls){
+  const t = $('#toast'); t.innerHTML = msg; t.className = 'toast' + (cls ? ' '+cls : '');
+  t.style.display = 'block'; clearTimeout(t._t);
+  t._t = setTimeout(()=> t.style.display='none', 3200);
+}
+
+// ---------- upload + analyze ----------
+const drop = $('#drop'), fileIn = $('#file');
+drop.onclick = () => fileIn.click();
+fileIn.onchange = () => fileIn.files[0] && analyze(fileIn.files[0]);
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.add('hot')}));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.remove('hot')}));
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if(f) analyze(f); });
+
+async function analyze(file){
+  $('#dropBig').innerHTML = '<span class="spinner"></span> analyzing…';
+  $('#previewImg').src = URL.createObjectURL(file);
+  $('#preview').style.display = 'block';
+  setStatus('analyzing', 'pending');
+
+  const fd = new FormData(); fd.append('file', file);
+  try{
+    const r = await fetch('/api/analyze', {method:'POST', body:fd});
+    if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || r.status); }
+    currentCase = await r.json();
+    render(currentCase);
+    toast('Analysis complete · case '+currentCase.case_id);
+  }catch(err){
+    toast('Analyze failed: '+err.message);
+    setStatus('error');
+  }finally{
+    $('#dropBig').textContent = 'Drop another photo';
+  }
+}
+
+// ---------- render ----------
+function render(c){
+  setStatus('case '+c.case_id+' · pending review', 'pending');
+  candidateLayer.clearLayers();
+  if(stagedMarker){ map.removeLayer(stagedMarker); stagedMarker=null; }
+
+  // candidates
+  const cd = $('#candidates'); cd.innerHTML='';
+  $('#candCount').textContent = c.candidates.length + ' visual';
+  if(!c.candidates.length){
+    cd.innerHTML = '<div class="empty">No visual candidates returned. See engine notes above.</div>';
+  } else {
+    const bounds = [];
+    c.candidates.forEach(cand => {
+      const pct = Math.round(cand.confidence*100);
+      const el = document.createElement('div');
+      el.className='cand';
+      el.innerHTML = `<div class="top"><span class="rank">#${cand.rank}</span>
+        <span class="conf">${pct}% · ${cand.source}</span></div>
+        <div class="coords">${cand.latitude.toFixed(5)}, ${cand.longitude.toFixed(5)}</div>
+        <div class="bar"><i style="width:${pct}%"></i></div>`;
+      el.onclick = () => {
+        document.querySelectorAll('.cand').forEach(x=>x.classList.remove('active'));
+        el.classList.add('active');
+        map.flyTo([cand.latitude, cand.longitude], 9, {duration:.8});
+        stagePin(cand.latitude, cand.longitude, 'candidate #'+cand.rank);
+      };
+      cd.appendChild(el);
+      const m = L.circleMarker([cand.latitude, cand.longitude], {
+        radius: 7+pct/12, color:'#e0143c', weight:2, fillColor:'#e0143c', fillOpacity:.25
+      }).addTo(candidateLayer).bindPopup(`#${cand.rank} · ${pct}%<br>${cand.latitude.toFixed(4)}, ${cand.longitude.toFixed(4)}`);
+      m.on('click', ()=> stagePin(cand.latitude, cand.longitude, 'candidate #'+cand.rank));
+      bounds.push([cand.latitude, cand.longitude]);
+    });
+    if(bounds.length) map.fitBounds(bounds, {padding:[60,60], maxZoom:8});
+  }
+
+  // clues
+  const cl = $('#clues'); cl.innerHTML='';
+  if(!c.clues.length){ cl.innerHTML='<div class="empty">No corroborating clues extracted.</div>'; }
+  else c.clues.forEach(x=>{
+    const el=document.createElement('div'); el.className='clue';
+    const conf = x.confidence!=null ? ` · ${Math.round(x.confidence*100)}%` : '';
+    el.innerHTML = `<span class="lbl">${x.type}${conf}</span><span class="val">${escapeHtml(x.value)}</span>`;
+    cl.appendChild(el);
+  });
+
+  // evidence (metadata)
+  const ev = $('#evidence'); ev.innerHTML='';
+  if(!c.exif_evidence.length){ ev.innerHTML='<div class="empty">No metadata present in file.</div>'; }
+  else c.exif_evidence.forEach(x=>{
+    const el=document.createElement('div'); el.className='evi';
+    el.innerHTML = `<span class="lbl">${x.type} · not used for answer</span>
+      <span class="val">${escapeHtml(x.value)}</span>
+      ${x.detail?`<div class="note">${escapeHtml(x.detail)}</div>`:''}`;
+    ev.appendChild(el);
+  });
+
+  // engine notes
+  const n = $('#notes');
+  if(c.engine_notes && c.engine_notes.length){
+    n.style.display='block';
+    n.innerHTML = '<b>Engine notes</b>' + c.engine_notes.map(t=>`<div>› ${escapeHtml(t)}</div>`).join('');
+  } else n.style.display='none';
+
+  $('#confirmBar').classList.remove('hidden');
+}
+
+function stagePin(lat, lon, why){
+  if(stagedMarker) map.removeLayer(stagedMarker);
+  stagedMarker = L.marker([lat,lon]).addTo(map).bindPopup('Staged pin · '+why).openPopup();
+  $('#latIn').value = lat.toFixed(6);
+  $('#lonIn').value = lon.toFixed(6);
+}
+
+// ---------- confirm ----------
+$('#confirmBtn').onclick = async () => {
+  if(!currentCase) return;
+  const lat = parseFloat($('#latIn').value), lon = parseFloat($('#lonIn').value);
+  if(isNaN(lat)||isNaN(lon)){ toast('Stage a valid lat/lon first.'); return; }
+  const body = {latitude:lat, longitude:lon, note:$('#noteIn').value||null, analyst:'analyst'};
+  const r = await fetch('/api/confirm/'+currentCase.case_id, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+  });
+  if(r.ok){
+    currentCase = await r.json();
+    setStatus('case '+currentCase.case_id+' · CONFIRMED', 'confirmed');
+    toast('✓ Pin confirmed & written to case record', 'confirmed');
+    if(stagedMarker) stagedMarker.setPopupContent('CONFIRMED · '+lat.toFixed(5)+', '+lon.toFixed(5)).openPopup();
+  } else toast('Confirm failed.');
+};
+
+$('#inconclusiveBtn').onclick = async () => {
+  if(!currentCase) return;
+  const r = await fetch('/api/inconclusive/'+currentCase.case_id, {method:'POST'});
+  if(r.ok){ currentCase = await r.json(); setStatus('case '+currentCase.case_id+' · inconclusive'); toast('Case marked inconclusive.'); }
+};
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+initMap();
+</script>
+</body>
+</html>
